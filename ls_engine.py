@@ -1,19 +1,21 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 #
 # Intaglio Bevel — Smooth raised-relief Bevel & Emboss for GIMP 3.2
-# Copyright (C) 2026 Moribund Institute
+# Copyright (C) 2026 MoribundMurdoch
 #
 # Algorithm derived from Krita's kis_ls_bevel_emboss_filter.cpp
 # Copyright (C) 2014 Dmitry Kazakov
 # and the LayerFX GIMP plugin (2008) by Jonathan Stipe.
 """
-ls_engine.py — Smooth Bevel & Emboss
+ls_engine.py — Bevel & Emboss
 
-Height map: smooth Euclidean distance transform (sub-pixel accurate).
+Height map: smooth Euclidean distance transform (sub-pixel accurate)
+            instead of integer binary erosion — eliminates the staircase
+            ridges that Sobel turns into hatching artefacts.
+
 Layers:     pure white (Screen) and pure black (Multiply) with the
             lighting carried in alpha. Source pixels are preserved
-            wherever the slope is zero. Both layers merged into a
-            single 'bevel' layer at the end for tidy layer panel.
+            wherever the slope is zero, so flat letter faces stay clean.
 """
 import gi, math
 gi.require_version('Gimp', '3.0')
@@ -23,7 +25,7 @@ from gi.repository import Gimp, Gegl
 import numpy as np
 from scipy.ndimage import gaussian_filter, sobel, distance_transform_edt
 
-LOG = __import__('os').path.expanduser("~/.config/GIMP/3.2/mor_engraved_relief_debug.log")
+LOG = __import__('os').path.expanduser("~/.config/GIMP/3.2/intaglio_debug.log")
 def log(msg):
     with open(LOG, "a") as f:
         f.write(msg + "\n")
@@ -116,7 +118,6 @@ def apply_bevel_emboss(drawable, config):
                                     hi_opacity, sh_opacity)
     log("bevel computed")
 
-    # Highlight layer (Screen) — placed first
     hi_layer = Gimp.Layer.new(image, "bevel-hi", w, h,
                               Gimp.ImageType.RGBA_IMAGE, 100.0,
                               Gimp.LayerMode.SCREEN)
@@ -124,8 +125,8 @@ def apply_bevel_emboss(drawable, config):
     hi_layer.set_offsets(ox, oy)
     numpy_to_buf(hi_arr, hi_layer.get_buffer(), w, h)
     hi_layer.update(0, 0, w, h)
+    log("hi layer written (Screen)")
 
-    # Shadow layer (Multiply) — placed above hi
     sh_layer = Gimp.Layer.new(image, "bevel-sh", w, h,
                               Gimp.ImageType.RGBA_IMAGE, 100.0,
                               Gimp.LayerMode.MULTIPLY)
@@ -133,11 +134,7 @@ def apply_bevel_emboss(drawable, config):
     sh_layer.set_offsets(ox, oy)
     numpy_to_buf(sh_arr, sh_layer.get_buffer(), w, h)
     sh_layer.update(0, 0, w, h)
-
-    # Merge sh_layer down into hi_layer → single "bevel" layer
-    merged = image.merge_down(sh_layer, Gimp.MergeType.EXPAND_AS_NECESSARY)
-    merged.set_name("bevel")
-    log("merged into single bevel layer")
+    log("sh layer written (Multiply)")
 
     Gimp.displays_flush()
     log("done")
