@@ -1,84 +1,104 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
 #
-# Antiquarian Etch Bevel — Bevel & Emboss layer style for GIMP 3.2
-# Copyright (C) 2026 MoribundMurdoch
+# Mor Engraved Relief — raised relief / intaglio-style bevel for GIMP 3.2
+# Copyright (C) 2026 Moribund Institute
 #
 # Algorithm derived from Krita's kis_ls_bevel_emboss_filter.cpp
 # Copyright (C) 2014 Dmitry Kazakov
 # and the LayerFX GIMP plugin (2008) by Jonathan Stipe.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 2 of the License, or
-# (at your option) any later version.
 
-#!/usr/bin/env python3
-import gi, sys, os, traceback
-gi.require_version('Gimp',   '3.0')
-gi.require_version('GimpUi', '3.0')
-gi.require_version('Gegl',   '0.4')
+import gi
+import os
+import sys
+import traceback
+
+gi.require_version("Gimp", "3.0")
+gi.require_version("GimpUi", "3.0")
+gi.require_version("Gegl", "0.4")
+
 from gi.repository import Gimp, GimpUi, GObject, GLib
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-LOG = os.path.expanduser("~/.config/GIMP/3.2/intaglio_debug.log")
+LOG = os.path.expanduser("~/.config/GIMP/3.2/mor_engraved_relief_debug.log")
+
+
 def log(msg):
     with open(LOG, "a") as f:
         f.write(msg + "\n")
 
+
 from ls_engine import apply_bevel_emboss
 
-class IntaglioBevelPlugin(Gimp.PlugIn):
+
+class MorEngravedReliefPlugin(Gimp.PlugIn):
     def do_set_i18n(self, name):
         return False, None, None
 
     def do_query_procedures(self):
-        return ["python-fu-intaglio-bevel"]
+        return ["python-fu-mor-engraved-relief"]
 
     def do_create_procedure(self, name):
         proc = Gimp.ImageProcedure.new(self, name, Gimp.PDBProcType.PLUGIN, self._run)
         proc.set_image_types("*")
         proc.set_sensitivity_mask(Gimp.ProcedureSensitivityMask.DRAWABLE)
-        proc.set_menu_label("Intaglio Bevel...")
+        proc.set_menu_label("Mor Engraved Relief...")
         proc.add_menu_path("<Image>/Filters/Layer Styles")
-        proc.set_documentation("Intaglio Bevel", "GEGL bevel ported from Krita.", name)
-        proc.set_attribution("Dmitry Kazakov (Krita) / Python port", "GPL", "2026")
+        proc.set_documentation(
+            "Mor Engraved Relief",
+            "Creates a raised relief / intaglio-style bevel effect for the selected layer.",
+            name,
+        )
+        proc.set_attribution(
+            "Moribund Institute; algorithm derived from Krita and LayerFX work",
+            "GPL-2.0-or-later",
+            "2026",
+        )
+
         proc.add_int_argument("size", "Size", "Bevel radius in pixels", 1, 100, 21, GObject.ParamFlags.READWRITE)
         proc.add_int_argument("soften", "Soften", "Edge softness", 0, 100, 0, GObject.ParamFlags.READWRITE)
         proc.add_int_argument("depth", "Depth (%)", "Bump intensity", 1, 100, 100, GObject.ParamFlags.READWRITE)
         proc.add_double_argument("angle", "Angle", "Light azimuth degrees", 0.0, 360.0, 120.0, GObject.ParamFlags.READWRITE)
         proc.add_double_argument("altitude", "Altitude", "Light elevation degrees", 0.0, 90.0, 30.0, GObject.ParamFlags.READWRITE)
-        proc.add_double_argument("highlight_opacity", "Highlight Opacity", "Screen pass opacity 0-1", 0.0, 1.0, 0.75, GObject.ParamFlags.READWRITE)
-        proc.add_double_argument("shadow_opacity", "Shadow Opacity", "Multiply pass opacity 0-1", 0.0, 1.0, 0.75, GObject.ParamFlags.READWRITE)
+        proc.add_double_argument("highlight_opacity", "Highlight Opacity", "Screen pass opacity from 0 to 1", 0.0, 1.0, 0.75, GObject.ParamFlags.READWRITE)
+        proc.add_double_argument("shadow_opacity", "Shadow Opacity", "Multiply pass opacity from 0 to 1", 0.0, 1.0, 0.75, GObject.ParamFlags.READWRITE)
         return proc
 
     def _run(self, procedure, run_mode, image, drawables, config, run_data=None):
         log("_run called")
+
         if run_mode == Gimp.RunMode.INTERACTIVE:
-            GimpUi.init("python-fu-intaglio-bevel")
-            dialog = GimpUi.ProcedureDialog.new(procedure, config, "Intaglio Bevel")
+            GimpUi.init("python-fu-mor-engraved-relief")
+            dialog = GimpUi.ProcedureDialog.new(procedure, config, "Mor Engraved Relief")
             dialog.fill(["size", "soften", "depth", "angle", "altitude", "highlight_opacity", "shadow_opacity"])
+
             if not dialog.run():
                 dialog.destroy()
                 return procedure.new_return_values(Gimp.PDBStatusType.CANCEL, GLib.Error())
+
             dialog.destroy()
 
         if len(drawables) != 1:
-            return procedure.new_return_values(Gimp.PDBStatusType.CALLING_ERROR, GLib.Error("Requires exactly one drawable."))
+            return procedure.new_return_values(
+                Gimp.PDBStatusType.CALLING_ERROR,
+                GLib.Error("Requires exactly one drawable."),
+            )
 
         drawable = drawables[0]
         cfg = {
-            "size":              config.get_property("size"),
-            "soften":            config.get_property("soften"),
-            "depth":             config.get_property("depth"),
-            "angle":             config.get_property("angle"),
-            "altitude":          config.get_property("altitude"),
+            "size": config.get_property("size"),
+            "soften": config.get_property("soften"),
+            "depth": config.get_property("depth"),
+            "angle": config.get_property("angle"),
+            "altitude": config.get_property("altitude"),
             "highlight_opacity": config.get_property("highlight_opacity"),
-            "shadow_opacity":    config.get_property("shadow_opacity"),
+            "shadow_opacity": config.get_property("shadow_opacity"),
         }
+
         log(f"config: {cfg}")
         image.undo_group_start()
+
         try:
             apply_bevel_emboss(drawable, cfg)
             log("apply_bevel_emboss completed OK")
@@ -86,8 +106,10 @@ class IntaglioBevelPlugin(Gimp.PlugIn):
             image.undo_group_end()
             log("FAILED: " + traceback.format_exc())
             return procedure.new_return_values(Gimp.PDBStatusType.EXECUTION_ERROR, GLib.Error(str(e)))
+
         image.undo_group_end()
         Gimp.displays_flush()
         return procedure.new_return_values(Gimp.PDBStatusType.SUCCESS, GLib.Error())
 
-Gimp.main(IntaglioBevelPlugin.__gtype__, sys.argv)
+
+Gimp.main(MorEngravedReliefPlugin.__gtype__, sys.argv)
