@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
 #
-# Mor Engraved Relief — raised relief / intaglio-style bevel for GIMP 3.2
+# Mor Engraved Relief — GIMP 3.2 layer-style plug-in
 # Copyright (C) 2026 Moribund Institute
 #
 # Algorithm derived from Krita's kis_ls_bevel_emboss_filter.cpp
@@ -13,10 +13,9 @@ import os
 import sys
 import traceback
 
-gi.require_version("Gimp", "3.0")
-gi.require_version("GimpUi", "3.0")
-gi.require_version("Gegl", "0.4")
-
+gi.require_version('Gimp', '3.0')
+gi.require_version('GimpUi', '3.0')
+gi.require_version('Gegl', '0.4')
 from gi.repository import Gimp, GimpUi, GObject, GLib
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -47,53 +46,49 @@ class MorEngravedReliefPlugin(Gimp.PlugIn):
         proc.add_menu_path("<Image>/Filters/Layer Styles")
         proc.set_documentation(
             "Mor Engraved Relief",
-            "Creates a raised relief / intaglio-style bevel effect for the selected layer.",
-            name,
+            "Smooth raised-relief / engraved bevel effect for GIMP.",
+            name
         )
         proc.set_attribution(
-            "Moribund Institute; algorithm derived from Krita and LayerFX work",
+            "Moribund Institute / Krita and LayerFX-derived Python port",
             "GPL-2.0-or-later",
-            "2026",
+            "2026"
         )
-
         proc.add_int_argument("size", "Size", "Bevel radius in pixels", 1, 100, 21, GObject.ParamFlags.READWRITE)
         proc.add_int_argument("soften", "Soften", "Edge softness", 0, 100, 0, GObject.ParamFlags.READWRITE)
         proc.add_int_argument("depth", "Depth (%)", "Bump intensity", 1, 100, 100, GObject.ParamFlags.READWRITE)
         proc.add_double_argument("angle", "Angle", "Light azimuth degrees", 0.0, 360.0, 120.0, GObject.ParamFlags.READWRITE)
         proc.add_double_argument("altitude", "Altitude", "Light elevation degrees", 0.0, 90.0, 30.0, GObject.ParamFlags.READWRITE)
-        proc.add_double_argument("highlight_opacity", "Highlight Opacity", "Screen pass opacity from 0 to 1", 0.0, 1.0, 0.75, GObject.ParamFlags.READWRITE)
-        proc.add_double_argument("shadow_opacity", "Shadow Opacity", "Multiply pass opacity from 0 to 1", 0.0, 1.0, 0.75, GObject.ParamFlags.READWRITE)
+        proc.add_double_argument("highlight_opacity", "Highlight Opacity", "Screen pass opacity 0-1", 0.0, 1.0, 0.75, GObject.ParamFlags.READWRITE)
+        proc.add_double_argument("shadow_opacity", "Shadow Opacity", "Multiply pass opacity 0-1", 0.0, 1.0, 0.75, GObject.ParamFlags.READWRITE)
         return proc
 
     def _run(self, procedure, run_mode, image, drawables, config, run_data=None):
         log("_run called")
-
         if run_mode == Gimp.RunMode.INTERACTIVE:
             GimpUi.init("python-fu-mor-engraved-relief")
             dialog = GimpUi.ProcedureDialog.new(procedure, config, "Mor Engraved Relief")
             dialog.fill(["size", "soften", "depth", "angle", "altitude", "highlight_opacity", "shadow_opacity"])
-
             if not dialog.run():
                 dialog.destroy()
                 return procedure.new_return_values(Gimp.PDBStatusType.CANCEL, GLib.Error())
-
             dialog.destroy()
 
         if len(drawables) != 1:
             return procedure.new_return_values(
                 Gimp.PDBStatusType.CALLING_ERROR,
-                GLib.Error("Requires exactly one drawable."),
+                GLib.Error("Requires exactly one drawable.")
             )
 
         drawable = drawables[0]
         cfg = {
-            "size": config.get_property("size"),
-            "soften": config.get_property("soften"),
-            "depth": config.get_property("depth"),
-            "angle": config.get_property("angle"),
-            "altitude": config.get_property("altitude"),
+            "size":              config.get_property("size"),
+            "soften":            config.get_property("soften"),
+            "depth":             config.get_property("depth"),
+            "angle":             config.get_property("angle"),
+            "altitude":          config.get_property("altitude"),
             "highlight_opacity": config.get_property("highlight_opacity"),
-            "shadow_opacity": config.get_property("shadow_opacity"),
+            "shadow_opacity":    config.get_property("shadow_opacity"),
         }
 
         log(f"config: {cfg}")
